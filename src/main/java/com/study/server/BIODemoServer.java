@@ -138,6 +138,10 @@ class SocketRunner implements Runnable {
 		this.socket = s;
 		this.timeout = timeout;
 		try {
+			//启用保活机制
+			socket.setKeepAlive(true);
+			//disable Nagle's algorithm
+			socket.setTcpNoDelay(true);
 			socket.setSoTimeout(this.timeout);
 
 			br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -155,11 +159,13 @@ class SocketRunner implements Runnable {
 				String data = br.readLine();
 				while (data != null) {
 					System.out.println(current.getName() + "<=== Recv:" + data);
-
+					
+					//Object retData=doBusiness(data)
+					//process retData
 					bw.write(current.getName() + " Resp." + LocalDateTime.now());
 					bw.newLine();
 					bw.flush();
-
+					//SocketTimeoutException  may occur
 					data = br.readLine();
 				}
 				break;
