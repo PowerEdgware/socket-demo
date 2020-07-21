@@ -68,12 +68,16 @@ public class BIODemoClient {
 	}
 	
 	
-	private SocketHolder getConnection() throws InterruptedException {
+	private SocketHolder getConnection(int milis) throws InterruptedException {
 		ReentrantLock lock=this.poolLock;
 		lock.lock();
 		try {
 			while(socketPool.isEmpty()) {
-				poolEmpty.await();
+				if(milis>0) {
+					poolEmpty.await(milis, TimeUnit.MILLISECONDS);
+				}else {
+					poolEmpty.await();
+				}
 			}
 			return socketPool.poll();
 		} finally {
@@ -96,10 +100,10 @@ public class BIODemoClient {
 	public String sendMsg(String msg,int milis ) {
 		SocketHolder conn=null;
 			try {
-				conn=getConnection();
+				conn=getConnection(milis);
 				String result=conn.sendAndGet(msg,milis);
 				return result;
-			} catch (InterruptedException e) {
+			} catch (InterruptedException |IOException e) {
 				throw new RuntimeException(e);
 			}finally {
 				returnConnection(conn);
@@ -120,6 +124,7 @@ class SocketHolder{
 		this.timeout=timeout;
 		try {
 			this.socket.setKeepAlive(true);
+			this.socket.setTcpNoDelay(false);
 			this.socket.setSoTimeout(timeout);
 			
 			br = new BufferedReader(new InputStreamReader(socket.getInputStream()));
@@ -129,7 +134,7 @@ class SocketHolder{
 		}
 	}
 	
-	public String sendAndGet(String msg,int ms) {
+	public String sendAndGet(String msg,int ms) throws IOException {
 		try {
 			this.socket.setSoTimeout(ms);
 			bw.write(msg);
@@ -137,10 +142,9 @@ class SocketHolder{
 			bw.flush();
 			
 			return br.readLine();//wait for timeout ms
-		} catch (Exception e) {
-			e.printStackTrace();
+		} catch (IOException e) {
+			throw e;
 		}
-		return null;
 	}
 
 	public void quietyCLose() {
